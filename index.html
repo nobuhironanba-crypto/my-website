@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>絵本ライブラリー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap');
+        body { font-family: 'M PLUS Rounded 1c', sans-serif; background-color: #fdfbf7; }
+        .book-card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body class="min-h-screen p-8 text-gray-700">
+
+    <header class="max-w-5xl mx-auto mb-12 text-center">
+        <h1 class="text-4xl md:text-5xl font-black text-indigo-900 mb-4">
+            <i class="fas fa-book-open text-indigo-500 mr-2"></i>みんなの絵本棚
+        </h1>
+        <p class="text-lg text-gray-500">AIと一緒に作った絵本のコレクションです</p>
+    </header>
+
+    <main class="max-w-5xl mx-auto">
+        <div id="book-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="col-span-full text-center py-10 text-gray-400">
+                <i class="fas fa-spinner fa-spin text-3xl mb-2"></i><br>本棚を整理中...
+            </div>
+        </div>
+    </main>
+
+    <footer class="mt-20 text-center text-gray-400 text-sm">
+        Powered by GitHub Pages & Gemini
+    </footer>
+
+    <script>
+        // ▼▼▼ ここをあなたの情報に書き換えてください ▼▼▼
+        const USER_NAME = "nobuhironanba-crypto";  // 例: "taro-yamada"
+        const REPO_NAME = "my-website";            // 例: "my-picture-books"
+        const FOLDER_NAME = "public";               // 絵本が入っているフォルダ名
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+        const listContainer = document.getElementById('book-list');
+
+        async function fetchBooks() {
+            // GitHub APIのエンドポイント
+            const apiUrl = `https://api.github.com/repos/${USER_NAME}/${REPO_NAME}/contents/${FOLDER_NAME}`;
+
+            try {
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    if(response.status === 404) throw new Error("フォルダが見つかりません。設定を確認してください。");
+                    if(response.status === 403) throw new Error("アクセス制限です。しばらく待ってから更新してください。");
+                    throw new Error("エラーが発生しました。");
+                }
+
+                const files = await response.json();
+                
+                // .htmlファイルだけを抽出 (index.htmlは除外した方がいい場合もありますが今回は全て表示)
+                const htmlFiles = files.filter(file => file.name.endsWith('.html'));
+
+                if (htmlFiles.length === 0) {
+                    listContainer.innerHTML = `<div class="col-span-full text-center text-gray-500">絵本がまだありません</div>`;
+                    return;
+                }
+
+                // リストをクリア
+                listContainer.innerHTML = '';
+
+                // カードを生成
+                htmlFiles.forEach(file => {
+                    const card = document.createElement('a');
+                    card.href = `${FOLDER_NAME}/${file.name}`; // リンク先
+                    card.className = "book-card block bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-transparent hover:border-indigo-300 transition-all duration-300 group";
+                    
+                    // ファイル名からタイトルっぽく加工 (例: ehon.html -> Ehon)
+                    const displayName = file.name.replace('.html', '');
+
+                    card.innerHTML = `
+                        <div class="h-40 bg-indigo-50 flex items-center justify-center text-6xl group-hover:scale-110 transition-transform duration-500">
+                            📚
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-2 truncate">
+                                ${displayName}
+                            </h3>
+                            <div class="flex justify-between items-center text-sm text-gray-500">
+                                <span><i class="far fa-file-code"></i> HTML絵本</span>
+                                <span class="text-indigo-500 font-bold group-hover:translate-x-1 transition-transform">読む &rarr;</span>
+                            </div>
+                        </div>
+                    `;
+                    listContainer.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error(error);
+                listContainer.innerHTML = `
+                    <div class="col-span-full text-center bg-red-50 p-6 rounded-xl border border-red-200 text-red-600">
+                        <i class="fas fa-exclamation-triangle text-2xl mb-2"></i><br>
+                        ${error.message}<br>
+                        <span class="text-xs text-gray-500 mt-2">ユーザー名とリポジトリ名が正しいか確認してください。<br>設定値: ${USER_NAME} / ${REPO_NAME}</span>
+                    </div>
+                `;
+            }
+        }
+
+        fetchBooks();
+    </script>
+</body>
+</html>
