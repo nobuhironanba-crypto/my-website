@@ -57,8 +57,8 @@
 
                 const files = await response.json();
                 
-                // .htmlファイルだけを抽出 (index.htmlは除外した方がいい場合もありますが今回は全て表示)
-                const htmlFiles = files.filter(file => file.name.endsWith('.html'));
+                // index.html は除外する設定を追加
+                const htmlFiles = files.filter(file => file.name.endsWith('.html') && file.name !== 'index.html');
 
                 if (htmlFiles.length === 0) {
                     listContainer.innerHTML = `<div class="col-span-full text-center text-gray-500">絵本がまだありません</div>`;
@@ -71,7 +71,7 @@
                 // カードを生成
                 htmlFiles.forEach(file => {
                     const card = document.createElement('a');
-                    card.href = `${FOLDER_NAME}/${file.name}`; // リンク先
+                    card.href = file.name; // リンク先
                     card.className = "book-card block bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-transparent hover:border-indigo-300 transition-all duration-300 group";
                     
                     // ファイル名からタイトルっぽく加工 (例: ehon.html -> Ehon)
@@ -111,3 +111,4 @@
 </body>
 
 </html>
+
