@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>絵本：アイデア妖精ピコと「世界への扉」</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: #2d333b; /* GitHub Dark Dimmed */
+            color: #adbac7;
+        }
+
+        .book-container {
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            background: #ffffff;
+            color: #333;
+        }
+
+        /* Animations */
+        .float-anim { animation: float 3s ease-in-out infinite; }
+        .pulse-anim { animation: pulse 2s infinite; }
+        .spin-slow { animation: spin 10s linear infinite; }
+        .slide-up { animation: slideUp 0.5s ease-out forwards; }
+
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Loader */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #6366f1;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex items-center justify-center bg-gray-900">
+
+    <div id="app" class="relative w-full max-w-5xl h-[90vh] book-container rounded-2xl overflow-hidden flex flex-col md:flex-row">
+        
+        <div id="illustration-area" class="w-full md:w-1/2 h-1/2 md:h-full bg-indigo-50 relative overflow-hidden flex items-center justify-center border-b-4 md:border-b-0 md:border-r-4 border-gray-100 transition-colors duration-700">
+            <div id="scene-container" class="relative w-full h-full"></div>
+            
+            <div class="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
+                <button onclick="openChat()" class="bg-white/90 backdrop-blur text-indigo-600 p-3 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center gap-2 border-2 border-indigo-200">
+                    <i class="fas fa-comment-dots text-xl"></i> <span class="text-sm font-bold hidden md:inline">Gemini先生に聞く</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="w-full md:w-1/2 h-1/2 md:h-full p-8 flex flex-col justify-between bg-white relative z-10">
+            <div>
+                <div class="flex justify-between items-center mb-4">
+                    <span id="page-number" class="text-gray-400 font-bold text-sm">Page 1</span>
+                    <div class="flex gap-2">
+                        <button onclick="resetApiKey()" class="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200"><i class="fas fa-key"></i> Key設定</button>
+                        <button onclick="playTTS()" id="tts-btn" class="text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-bold hover:bg-indigo-200 flex items-center gap-1">
+                            <i class="fas fa-volume-up"></i> <span>読む</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <h2 id="page-title" class="text-2xl md:text-3xl font-black text-gray-800 mb-6 min-h-[3rem] leading-tight">タイトル</h2>
+                <div id="page-text" class="text-gray-600 text-lg leading-loose font-medium slide-up"></div>
+            </div>
+
+            <div class="flex justify-between items-center mt-6 pt-6 border-t border-gray-100">
+                <button onclick="prevPage()" id="prev-btn" class="px-6 py-3 bg-gray-100 text-gray-500 rounded-full font-bold hover:bg-gray-200 transition-colors disabled:opacity-50">
+                    <i class="fas fa-arrow-left"></i> 前へ
+                </button>
+                <button onclick="nextPage()" id="next-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 shadow-lg transition-transform transform hover:scale-105">
+                    次へ <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="apikey-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl p-8 text-center">
+            <div class="text-4xl mb-4">🔑</div>
+            <h2 class="text-xl font-bold mb-2">Gemini APIキーが必要です</h2>
+            <p class="text-gray-500 text-sm mb-4">この絵本はAIを使って動きます。<br>キーはブラウザ内にのみ保存されます。</p>
+            <input type="password" id="apikey-input" placeholder="AIzaSy..." class="w-full border p-3 rounded mb-4">
+            <button onclick="saveApiKey()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded hover:bg-indigo-700">冒険を始める</button>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="block mt-4 text-xs text-indigo-500 underline">キーを取得する (Google)</a>
+        </div>
+    </div>
+
+    <div id="chat-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[60vh]">
+            <div class="bg-indigo-600 p-4 flex justify-between items-center text-white">
+                <span class="font-bold">Gemini先生</span>
+                <button onclick="closeChat()"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4"></div>
+            <div class="p-4 border-t">
+                <div class="flex gap-2">
+                    <input type="text" id="chat-input" class="flex-1 border rounded-full px-4 py-2" placeholder="質問してね" onkeypress="if(event.key === 'Enter') sendMessage()">
+                    <button onclick="sendMessage()" class="bg-indigo-600 text-white rounded-full w-10 h-10"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA & STORY ---
+        const pages = [
+            {
+                title: "アイデア妖精ピコと\n世界への扉",
+                text: "これは、まだ誰にも知られていない小さなアイデア「ピコ」が、Gemini先生と力を合わせて、インターネットという広い世界へ飛び出すまでの冒険のお話。",
+                scene: "cover",
+                bg: "bg-indigo-50"
+            },
+            {
+                title: "ぼくはピコ！形がないんだ",
+                text: "「あーあ、ぼくは面白いお話のアイデアなんだけどなぁ」<br>ピコは頭の中でフワフワ浮かんでいました。<br>でも、ピコには体がありません。だから、誰かに読んでもらうことができないのです。",
+                scene: "idea",
+                bg: "bg-yellow-50"
+            },
+            {
+                title: "Gemini先生にお願い！",
+                text: "そこでピコは、物知りの魔法使い「Gemini先生」に相談しました。<br>「先生！ぼくを絵本にしてください！」<br>先生は優しく微笑んで言いました。<br>「よし、キミを『HTML』という魔法の言葉で包んであげよう」",
+                scene: "consult",
+                bg: "bg-purple-50"
+            },
+            {
+                title: "魔法の言葉で変身！",
+                text: "カタカタカタ……ッターン！<br>Gemini先生が杖（キーボード）を振ると、ピコは真っ白な『ファイル』に変身しました。<br>「わあ！これがぼくの体？ index.html って書いてある！」<br>これでピコは、パソコンの中に住めるようになりました。",
+                scene: "coding",
+                bg: "bg-blue-50"
+            },
+            {
+                title: "でも、まだ誰も来ない…",
+                text: "けれど、ピコはまだパソコンの中にひとりぼっち。<br>「これじゃあ、世界中の人に見てもらえないよ…」<br>すると先生が言いました。<br>「それなら『GitHub（ギットハブ）の森』へ行こう。そこには世界へ続く扉があるんだ」",
+                scene: "lonely",
+                bg: "bg-gray-100"
+            },
+            {
+                title: "GitHubの森へ出発！",
+                text: "森には『リポジトリ』という名前の、本棚の木がたくさん生えています。<br>ピコは自分専用の木（New Repository）を作りました。<br>「ここがぼくの新しいお家だね！」<br>ピコは自分の体を、その木の上にえいっと乗せました（Upload）。",
+                scene: "github_forest",
+                bg: "bg-green-50"
+            },
+            {
+                title: "最後の仕上げ、スイッチオン",
+                text: "木の上には『Settings（設定）』という歯車があります。<br>それを回して、『Pages』というスイッチをパチン！と入れました。<br>すると……木が光り始めました！",
+                scene: "settings",
+                bg: "bg-orange-50"
+            },
+            {
+                title: "あぶない！カギの秘密",
+                text: "「待って！」先生が叫びました。「そのままじゃ、大事な『APIキー』が丸見えだよ！」<br>泥棒が入らないように、先生は特別な魔法（リファラー制限）をかけました。<br>「これで、この場所からしか魔法は使えないよ。安心だね」",
+                scene: "security",
+                bg: "bg-red-50"
+            },
+            {
+                title: "世界への扉が開いた！",
+                text: "準備完了！<br>すると、ピコの頭上に虹色の『URL』が現れました。<br>そのURLをクリックすると、世界中のどこからでも、ピコの姿が見えるようになったのです！",
+                scene: "publish",
+                bg: "bg-sky-100"
+            },
+            {
+                title: "つながる世界",
+                text: "「見て！日本からも、アメリカからも、ぼくが見えてる！」<br>ピコは大喜び。<br>Gemini先生とGitHubの森のおかげで、小さなアイデアだったピコは、世界中の友達と遊べるようになったのでした。",
+                scene: "world",
+                bg: "bg-indigo-100"
+            }
+        ];
+
+        let currentPage = 0;
+        let apiKey = localStorage.getItem("gemini_api_key");
+        let audioContext = null;
+
+        // --- RENDER LOGIC ---
+        function renderPage() {
+            const page = pages[currentPage];
+            document.getElementById('page-number').innerText = `Page ${currentPage + 1} / ${pages.length}`;
+            document.getElementById('page-title').innerText = page.title;
+            document.getElementById('page-text').innerHTML = page.text;
+            document.getElementById('illustration-area').className = `w-full md:w-1/2 h-1/2 md:h-full relative overflow-hidden flex items-center justify-center transition-colors duration-700 ${page.bg}`;
+            
+            document.getElementById('prev-btn').disabled = currentPage === 0;
+            document.getElementById('next-btn').innerHTML = currentPage === pages.length - 1 ? 'おしまい' : '次へ <i class="fas fa-arrow-right"></i>';
+
+            renderScene(page.scene);
+        }
+
+        function nextPage() { if(currentPage < pages.length - 1) { currentPage++; renderPage(); } }
+        function prevPage() { if(currentPage > 0) { currentPage--; renderPage(); } }
+
+        // --- VISUALS (SVG Generative) ---
+        function renderScene(scene) {
+            const container = document.getElementById('scene-container');
+            const W = 300; const H = 300; // coordinate space
+            let html = '';
+
+            // Characters
+            const Piko = (x, y, emotion="happy") => {
+                const color = emotion === 'file' ? '#FFF' : '#FFD700';
+                const shape = emotion === 'file' ? 'rounded-none border-2 border-gray-300' : 'rounded-full';
+                const eye = emotion === 'file' ? 't-1/3' : 'top-1/3';
+                return `<div class="absolute float-anim flex items-center justify-center shadow-lg" style="left:${x}%; top:${y}%; width:80px; height:80px; background:${color}; ${shape}; transition:all 0.5s;">
+                    <div class="absolute w-2 h-2 bg-black rounded-full left-4 ${eye}"></div>
+                    <div class="absolute w-2 h-2 bg-black rounded-full right-4 ${eye}"></div>
+                    <div class="absolute w-4 h-2 bg-pink-300 rounded-full top-1/2 opacity-50"></div>
+                    ${emotion === 'file' ? '<div class="absolute bottom-2 text-xs text-gray-400 font-mono">.html</div>' : ''}
+                </div>`;
+            };
+            
+            const Gemini = (x, y) => `<div class="absolute pulse-anim text-6xl text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 font-black" style="left:${x}%; top:${y}%;">✦</div>`;
+            
+            const Cloud = (x, y) => `<div class="absolute text-gray-200 text-9xl opacity-50" style="left:${x}%; top:${y}%;"><i class="fas fa-cloud"></i></div>`;
+            
+            const Tree = (x, y) => `<div class="absolute flex flex-col items-center" style="left:${x}%; top:${y}%;">
+                <div class="w-24 h-24 bg-green-500 rounded-full shadow-lg relative flex items-center justify-center text-white text-2xl"><i class="fas fa-book"></i></div>
+                <div class="w-4 h-20 bg-amber-700"></div>
+            </div>`;
+
+            // Scene Logic
+            switch(scene) {
+                case 'cover':
+                    html = Piko(40, 40) + Gemini(70, 20) + `<div class="absolute bottom-10 text-gray-400 font-bold">START ▶</div>`;
+                    break;
+                case 'idea':
+                    html = `<div class="absolute inset-0 bg-gray-900 opacity-10"></div>` + Piko(40, 40) + `<div class="absolute top-20 right-20 text-4xl">💭</div>`;
+                    break;
+                case 'consult':
+                    html = Piko(20, 50) + Gemini(60, 40) + `<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-4xl">🗣️</div>`;
+                    break;
+                case 'coding':
+                    html = `<div class="absolute inset-0 font-mono text-xs text-blue-200 opacity-30 p-4 break-words overflow-hidden">&lt;html&gt;&lt;body&gt;&lt;div&gt;...</div>` + 
+                           Piko(40, 40, 'file') + Gemini(80, 10);
+                    break;
+                case 'lonely':
+                     html = `<div class="absolute w-60 h-40 border-4 border-gray-400 rounded-lg top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center bg-gray-800"></div>` + 
+                            Piko(45, 45, 'file');
+                    break;
+                case 'github_forest':
+                    html = Tree(20, 30) + Tree(70, 40) + Tree(40, 60) + Piko(42, 20, 'file');
+                    break;
+                case 'settings':
+                    html = `<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-orange-200 rounded-full flex items-center justify-center spin-slow"><i class="fas fa-cog text-6xl text-orange-500"></i></div>` + 
+                           `<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white font-bold text-xl">ON!</div>`;
+                    break;
+                case 'security':
+                    html = `<div class="absolute inset-0 flex items-center justify-center"><i class="fas fa-shield-alt text-9xl text-red-200"></i></div>` + 
+                           `<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-4xl">🔒</div>` + Piko(40, 60, 'file');
+                    break;
+                case 'publish':
+                    html = `<div class="absolute inset-0 bg-gradient-to-b from-sky-200 to-transparent"></div>` + 
+                           `<div class="absolute top-10 w-full text-center font-mono text-indigo-600 bg-white/50 py-2">https://user.github.io/piko</div>` + Piko(40, 40);
+                    break;
+                case 'world':
+                    html = `<div class="absolute w-60 h-60 bg-blue-200 rounded-full top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-4 border-white opacity-50"></div>` + 
+                           Piko(40, 35) + `<div class="absolute top-20 left-20">👋</div><div class="absolute bottom-20 right-20">👋</div>`;
+                    break;
+            }
+            container.innerHTML = html;
+        }
+
+        // --- GEMINI API & UTILS ---
+        function checkApiKey() {
+            if (!apiKey) document.getElementById('apikey-modal').classList.remove('hidden');
+        }
+
+        function saveApiKey() {
+            const val = document.getElementById('apikey-input').value.trim();
+            if(val) { localStorage.setItem("gemini_api_key", val); apiKey = val; document.getElementById('apikey-modal').classList.add('hidden'); }
+        }
+
+        function resetApiKey() {
+            if(confirm("キーを削除しますか？")) { localStorage.removeItem("gemini_api_key"); location.reload(); }
+        }
+
+        async function callGemini(text, systemInstruction) {
+            if(!apiKey) { checkApiKey(); return "キーを設定してね"; }
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{ text: text }] }], systemInstruction: { parts: [{ text: systemInstruction }] } })
+                });
+                const data = await res.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch(e) { return "エラーが発生しました"; }
+        }
+
+        async function callGeminiTTS(text) {
+             if(!apiKey) return null;
+             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+             try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{ text: text }] }], generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } } })
+                });
+                const data = await res.json();
+                return data.candidates[0].content.parts[0].inlineData.data;
+             } catch(e) { return null; }
+        }
+
+        async function playTTS() {
+            const btn = document.getElementById('tts-btn');
+            btn.innerText = "生成中...";
+            const audioData = await callGeminiTTS(pages[currentPage].text.replace(/<[^>]*>/g, ''));
+            if(audioData) {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const bytes = Uint8Array.from(atob(audioData), c => c.charCodeAt(0));
+                const buffer = await audioCtx.decodeAudioData(bytes.buffer);
+                const source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioCtx.destination);
+                source.start(0);
+                btn.innerText = "再生中";
+                source.onended = () => btn.innerHTML = '<i class="fas fa-volume-up"></i> 読む';
+            } else {
+                btn.innerText = "エラー";
+            }
+        }
+
+        // --- CHAT ---
+        function openChat() { document.getElementById('chat-modal').classList.remove('hidden'); }
+        function closeChat() { document.getElementById('chat-modal').classList.add('hidden'); }
+        
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value;
+            if(!msg) return;
+            const box = document.getElementById('chat-messages');
+            box.innerHTML += `<div class="text-right"><span class="bg-indigo-100 p-2 rounded inline-block text-sm">${msg}</span></div>`;
+            input.value = '';
+            
+            box.innerHTML += `<div class="text-left text-gray-400 text-xs" id="loading">考え中...</div>`;
+            const reply = await callGemini(msg, "You are 'Gemini-sensei', a wise and kind AI wizard teaching a user how to publish websites on GitHub. Keep answers short, encouraging, and simple.");
+            document.getElementById('loading').remove();
+            box.innerHTML += `<div class="text-left"><span class="bg-indigo-600 text-white p-2 rounded inline-block text-sm shadow">${reply}</span></div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // Init
+        renderPage();
+        checkApiKey();
+    </script>
+</body>
+</html>
