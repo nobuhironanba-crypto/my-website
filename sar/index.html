@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
   <head>
@@ -72,22 +73,20 @@
          ========================================= */
       
       /* Common Print Rules */
-      @media print, .print-preview {
-        /* Reset Body */
-        body {
+      @media print {
+        @page {
+          margin: 0;
+          size: auto;
+        }
+
+        /* Reset Body and Containers to allow full page printing */
+        body, #root, main, .flex-1, .overflow-y-auto, .overflow-x-auto, .overflow-hidden {
           background-color: white !important;
           color: black !important;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
-        }
-
-        /* Hide UI elements */
-        .no-print, nav, aside, button, .sidebar-container, .print-control-bar {
-          display: none !important;
-        }
-
-        /* Reset Containers */
-        #root, main, .flex-1, .overflow-y-auto, .overflow-x-auto {
+          
+          /* CRITICAL: Allow content to flow across pages */
           width: 100% !important;
           height: auto !important;
           overflow: visible !important;
@@ -95,32 +94,35 @@
           position: static !important;
           margin: 0 !important;
           padding: 0 !important;
-          background-color: white !important;
-          color: black !important;
           border: none !important;
           box-shadow: none !important;
         }
 
-        /* Specific adjustments for WeeklyAttendanceView table */
+        /* Hide UI elements */
+        .no-print, nav, aside, button, .sidebar-container, .print-control-bar, 
+        .fixed.top-0, .fixed.bottom-0, .fixed.left-0, .fixed.right-0 {
+          display: none !important;
+        }
+
+        /* Page Breaks */
+        .break-after-page {
+          page-break-after: always !important;
+          break-after: page !important;
+        }
+        
+        .break-inside-avoid {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+
+        /* Table Specifics */
         table {
           width: 100% !important;
           border-collapse: collapse !important;
-          page-break-inside: auto;
-        }
-        tr {
-          page-break-inside: avoid;
-          page-break-after: auto;
         }
         
         .print-only {
           display: block !important;
-        }
-      }
-
-      /* Specific adjustments for @media print (Paper) */
-      @media print {
-        @page {
-          margin: 10mm;
         }
       }
 
@@ -143,11 +145,12 @@
     "react": "https://aistudiocdn.com/react@^19.2.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3"
   }
 }
 </script>
-  <script type="module" crossorigin src="https://nobuhironanba-crypto.github.io/my-website/sar/assets/index-CdTd05j3.js"></script>
+  <script type="module" crossorigin src="https://nobuhironanba-crypto.github.io/my-website/sar/assets/index-DXRNOBFz.js"></script>
 </head>
   <body>
     <div id="root"></div>
