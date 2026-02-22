@@ -19,20 +19,45 @@
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .animate-fade-in { animation: fadeIn 0.5s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* PWA iOS Safe Area */
         body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
     <div class="max-w-4xl mx-auto p-4 md:p-8">
-        <header class="mb-6 text-center">
-            <h1 class="text-3xl font-bold text-gray-800 mb-1">GGスコア解析</h1>
-            <p class="text-gray-600 text-sm">スコアカードを撮影して一括データ化</p>
-        </header>
+        <!-- Settings Header -->
+        <div class="flex justify-between items-center mb-6">
+            <div class="text-left">
+                <h1 class="text-3xl font-bold text-gray-800 mb-1">GGスコア解析</h1>
+                <p class="text-gray-600 text-sm">スコアカードを撮影してデータ化</p>
+            </div>
+            <button id="settings-toggle" class="p-2 text-gray-500 hover:text-green-600 transition-colors">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- API Key Settings Panel -->
+        <div id="settings-panel" class="hidden mb-8 animate-fade-in">
+            <div class="bg-gray-800 text-white p-6 rounded-2xl shadow-inner">
+                <h3 class="text-lg font-bold mb-4 flex items-center">
+                    <span class="mr-2">🔑</span> APIキーの設定
+                </h3>
+                <p class="text-gray-400 text-xs mb-4">Gemini APIキーを入力して保存してください。キーはあなたのブラウザ内にのみ保存されます。</p>
+                <div class="space-y-4">
+                    <input type="password" id="api-key-input" placeholder="AIZA..." class="w-full bg-gray-700 border-none rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500">
+                    <div class="flex gap-2">
+                        <button id="save-key-btn" class="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-bold transition">保存する</button>
+                        <button id="clear-key-btn" class="flex-1 bg-red-600 hover:bg-red-700 py-2 rounded-lg font-bold transition">削除する</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Main Card -->
         <div class="bg-white rounded-2xl shadow-xl p-6 mb-8 border-t-8 border-green-600">
-            <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 transition-colors hover:border-green-400">
+            <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 transition-colors hover:border-green-400 text-center">
                 <input type="file" id="file-input" accept="image/*,application/pdf" class="hidden" multiple>
                 
                 <div id="upload-prompt" class="space-y-4">
@@ -42,10 +67,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
                         </svg>
                     </div>
-                    <button onclick="document.getElementById('file-input').click()" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-xl hover:bg-green-700 shadow-lg active:scale-95 transition-all">
+                    <button id="main-upload-btn" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-xl hover:bg-green-700 shadow-lg active:scale-95 transition-all">
                         スコアを撮影 / 選択
                     </button>
-                    <p class="text-xs text-gray-400">PDFや複数枚の一括処理に対応</p>
+                    <p id="key-warning" class="text-red-500 text-xs font-bold hidden">※設定ボタンからAPIキーを保存してください</p>
                 </div>
 
                 <div id="preview-container" class="hidden space-y-4">
@@ -58,16 +83,16 @@
             </div>
         </div>
 
-        <!-- Progress Indicator -->
-        <div id="loading" class="hidden flex flex-col items-center justify-center p-10 bg-white rounded-2xl shadow-lg mb-8">
-            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-14 w-14 mb-4"></div>
-            <p id="loading-status" class="text-gray-700 font-bold">解析中...</p>
-            <div class="w-full max-w-xs bg-gray-100 rounded-full h-3 mt-6">
+        <!-- Loading View -->
+        <div id="loading" class="hidden flex flex-col items-center justify-center p-10 bg-white rounded-2xl shadow-lg mb-8 text-center">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-14 w-14 mb-4 mx-auto"></div>
+            <p id="loading-status" class="text-gray-700 font-bold">準備中...</p>
+            <div class="w-full max-w-xs bg-gray-100 rounded-full h-3 mt-6 mx-auto">
                 <div id="progress-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
             </div>
         </div>
 
-        <!-- Result View -->
+        <!-- Result Section -->
         <div id="result-section" class="hidden animate-fade-in pb-20">
             <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
                 <div class="p-4 border-b bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-3">
@@ -99,31 +124,20 @@
             </div>
         </div>
 
-        <!-- Toast Notification -->
         <div id="toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-black text-white px-8 py-4 rounded-full text-sm font-bold opacity-0 transition-opacity pointer-events-none z-50">
-            コピー完了！
+            完了しました
         </div>
     </div>
 
     <script type="module">
-        const apiKey = ""; 
+        // --- State Management ---
+        const LOCAL_STORAGE_KEY = 'gg_score_gemini_api_key';
+        let currentApiKey = localStorage.getItem(LOCAL_STORAGE_KEY) || "";
 
         // PDF.js Worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        // Manifest Creation for PWA
-        const manifest = {
-            "name": "GGスコア解析",
-            "short_name": "GGスコア",
-            "start_url": ".",
-            "display": "standalone",
-            "background_color": "#f9fafb",
-            "theme_color": "#16a34a",
-            "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/3306/3306613.png", "sizes": "512x512", "type": "image/png" }]
-        };
-        const manifestStr = encodeURIComponent(JSON.stringify(manifest));
-        document.getElementById('pwa-manifest').setAttribute('href', `data:application/manifest+json,${manifestStr}`);
-
+        // Elements
         const fileInput = document.getElementById('file-input');
         const uploadPrompt = document.getElementById('upload-prompt');
         const previewContainer = document.getElementById('preview-container');
@@ -137,14 +151,67 @@
         const downloadBtn = document.getElementById('download-btn');
         const copyBtn = document.getElementById('copy-btn');
         const toast = document.getElementById('toast');
+        
+        // Settings Elements
+        const settingsToggle = document.getElementById('settings-toggle');
+        const settingsPanel = document.getElementById('settings-panel');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const saveKeyBtn = document.getElementById('save-key-btn');
+        const clearKeyBtn = document.getElementById('clear-key-btn');
+        const keyWarning = document.getElementById('key-warning');
 
-        let allScores = [];
-        let imageQueue = []; 
+        // Initial Setup
+        if (currentApiKey) {
+            apiKeyInput.value = currentApiKey;
+            keyWarning.classList.add('hidden');
+        } else {
+            keyWarning.classList.remove('hidden');
+        }
+
+        // PWA Manifest
+        const manifest = {
+            "name": "GGスコア解析",
+            "short_name": "GGスコア",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#f9fafb",
+            "theme_color": "#16a34a",
+            "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/3306/3306613.png", "sizes": "512x512", "type": "image/png" }]
+        };
+        const manifestStr = encodeURIComponent(JSON.stringify(manifest));
+        document.getElementById('pwa-manifest').setAttribute('href', `data:application/manifest+json,${manifestStr}`);
+
+        // --- Logic ---
+        settingsToggle.addEventListener('click', () => settingsPanel.classList.toggle('hidden'));
+
+        saveKeyBtn.addEventListener('click', () => {
+            const val = apiKeyInput.value.trim();
+            if (val) {
+                localStorage.setItem(LOCAL_STORAGE_KEY, val);
+                currentApiKey = val;
+                showToast("キーを保存しました");
+                settingsPanel.classList.add('hidden');
+                keyWarning.classList.add('hidden');
+            }
+        });
+
+        clearKeyBtn.addEventListener('click', () => {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            currentApiKey = "";
+            apiKeyInput.value = "";
+            showToast("キーを削除しました");
+            keyWarning.classList.remove('hidden');
+        });
+
+        document.getElementById('main-upload-btn').addEventListener('click', () => fileInput.click());
 
         fileInput.addEventListener('change', async e => {
             const files = Array.from(e.target.files);
             if (files.length > 0) await processFiles(files);
         });
+
+        let allScores = [];
+        let imageQueue = []; 
 
         async function processFiles(files) {
             imageQueue = [];
@@ -193,6 +260,12 @@
         }
 
         analyzeBtn.addEventListener('click', async () => {
+            if (!currentApiKey) {
+                showToast("先にAPIキーを設定してください");
+                settingsPanel.classList.remove('hidden');
+                return;
+            }
+
             allScores = [];
             loading.classList.remove('hidden');
             analyzeBtn.disabled = true;
@@ -204,7 +277,13 @@
                 try {
                     const pageScores = await analyzeImage(imageQueue[i]);
                     allScores.push(...pageScores);
-                } catch (err) { console.error(err); }
+                } catch (err) { 
+                    console.error(err);
+                    showToast("エラーが発生しました。キーを確認してください");
+                    loading.classList.add('hidden');
+                    analyzeBtn.disabled = false;
+                    return;
+                }
             }
 
             progressBar.style.width = `100%`;
@@ -216,7 +295,7 @@
 
         async function analyzeImage(base64Data) {
             const response = await fetchWithRetry(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${currentApiKey}`,
                 {
                     method: 'POST',
                     body: JSON.stringify({
@@ -245,6 +324,7 @@
                 }
             );
             const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
             return JSON.parse(data.candidates[0].content.parts[0].text);
         }
 
@@ -286,7 +366,7 @@
             const ta = document.createElement("textarea");
             ta.value = tsv; document.body.appendChild(ta); ta.select();
             document.execCommand('copy'); document.body.removeChild(ta);
-            showToast();
+            showToast("Excel用にコピーしました");
         });
 
         downloadBtn.addEventListener('click', () => {
@@ -299,7 +379,8 @@
             a.click();
         });
 
-        function showToast() {
+        function showToast(msg) {
+            toast.innerText = msg;
             toast.style.opacity = "1";
             setTimeout(() => { toast.style.opacity = "0"; }, 2000);
         }
@@ -307,7 +388,6 @@
         async function fetchWithRetry(url, options, retries = 5, backoff = 1000) {
             try {
                 const res = await fetch(url, options);
-                if (!res.ok) throw new Error(res.statusText);
                 return res;
             } catch (err) {
                 if (retries > 0) {
