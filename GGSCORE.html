@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GGスコア解析</title>
+    
+    <!-- PWA Settings -->
+    <meta name="theme-color" content="#16a34a">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3306/3306613.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" id="pwa-manifest">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        .loader { border-top-color: #3498db; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* PWA iOS Safe Area */
+        body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <div class="max-w-4xl mx-auto p-4 md:p-8">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-1">GGスコア解析</h1>
+            <p class="text-gray-600 text-sm">スコアカードを撮影して一括データ化</p>
+        </header>
+
+        <!-- Main Card -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 mb-8 border-t-8 border-green-600">
+            <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 transition-colors hover:border-green-400">
+                <input type="file" id="file-input" accept="image/*,application/pdf" class="hidden" multiple>
+                
+                <div id="upload-prompt" class="space-y-4">
+                    <div class="bg-green-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto">
+                        <svg class="h-12 w-12 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <button onclick="document.getElementById('file-input').click()" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-xl hover:bg-green-700 shadow-lg active:scale-95 transition-all">
+                        スコアを撮影 / 選択
+                    </button>
+                    <p class="text-xs text-gray-400">PDFや複数枚の一括処理に対応</p>
+                </div>
+
+                <div id="preview-container" class="hidden space-y-4">
+                    <div id="file-info" class="p-4 bg-green-50 rounded-xl text-green-800 font-bold border border-green-200"></div>
+                    <button id="analyze-btn" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-xl hover:bg-blue-700 shadow-lg active:scale-95 transition-all">
+                        AI解析を開始
+                    </button>
+                    <button onclick="location.reload()" class="text-gray-400 text-sm hover:underline">キャンセル</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Indicator -->
+        <div id="loading" class="hidden flex flex-col items-center justify-center p-10 bg-white rounded-2xl shadow-lg mb-8">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-14 w-14 mb-4"></div>
+            <p id="loading-status" class="text-gray-700 font-bold">解析中...</p>
+            <div class="w-full max-w-xs bg-gray-100 rounded-full h-3 mt-6">
+                <div id="progress-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Result View -->
+        <div id="result-section" class="hidden animate-fade-in pb-20">
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                <div class="p-4 border-b bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <h2 class="font-bold text-gray-700">解析データ</h2>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <button id="copy-btn" class="flex-1 sm:flex-none bg-gray-800 text-white px-4 py-3 rounded-lg text-sm font-bold active:bg-black transition">
+                            Excel用コピー
+                        </button>
+                        <button id="download-btn" class="flex-1 sm:flex-none bg-indigo-600 text-white px-4 py-3 rounded-lg text-sm font-bold active:bg-indigo-800 transition">
+                            CSV保存
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse" id="score-table">
+                        <thead class="bg-gray-100 text-gray-600 text-[10px] uppercase font-bold">
+                            <tr>
+                                <th class="p-3 border-b">氏名</th>
+                                <th class="p-3 border-b text-center">1</th><th class="p-3 border-b text-center">2</th>
+                                <th class="p-3 border-b text-center">3</th><th class="p-3 border-b text-center">4</th>
+                                <th class="p-3 border-b text-center">5</th><th class="p-3 border-b text-center">6</th>
+                                <th class="p-3 border-b text-center">7</th><th class="p-3 border-b text-center">8</th>
+                                <th class="p-3 border-b text-center">合計</th>
+                            </tr>
+                        </thead>
+                        <tbody id="score-tbody" class="text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-black text-white px-8 py-4 rounded-full text-sm font-bold opacity-0 transition-opacity pointer-events-none z-50">
+            コピー完了！
+        </div>
+    </div>
+
+    <script type="module">
+        const apiKey = ""; 
+
+        // PDF.js Worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // Manifest Creation for PWA
+        const manifest = {
+            "name": "GGスコア解析",
+            "short_name": "GGスコア",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#f9fafb",
+            "theme_color": "#16a34a",
+            "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/3306/3306613.png", "sizes": "512x512", "type": "image/png" }]
+        };
+        const manifestStr = encodeURIComponent(JSON.stringify(manifest));
+        document.getElementById('pwa-manifest').setAttribute('href', `data:application/manifest+json,${manifestStr}`);
+
+        const fileInput = document.getElementById('file-input');
+        const uploadPrompt = document.getElementById('upload-prompt');
+        const previewContainer = document.getElementById('preview-container');
+        const fileInfo = document.getElementById('file-info');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const loading = document.getElementById('loading');
+        const loadingStatus = document.getElementById('loading-status');
+        const progressBar = document.getElementById('progress-bar');
+        const resultSection = document.getElementById('result-section');
+        const scoreTbody = document.getElementById('score-tbody');
+        const downloadBtn = document.getElementById('download-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const toast = document.getElementById('toast');
+
+        let allScores = [];
+        let imageQueue = []; 
+
+        fileInput.addEventListener('change', async e => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) await processFiles(files);
+        });
+
+        async function processFiles(files) {
+            imageQueue = [];
+            loading.classList.remove('hidden');
+            loadingStatus.innerText = "読み込み中...";
+            
+            for (const file of files) {
+                if (file.type === "application/pdf") {
+                    const pdfImages = await convertPdfToImages(file);
+                    imageQueue.push(...pdfImages);
+                } else if (file.type.startsWith("image/")) {
+                    const base64 = await fileToBase64(file);
+                    imageQueue.push(base64);
+                }
+            }
+
+            loading.classList.add('hidden');
+            fileInfo.innerText = `${imageQueue.length}件のカードを読み込みました`;
+            previewContainer.classList.remove('hidden');
+            uploadPrompt.classList.add('hidden');
+        }
+
+        async function convertPdfToImages(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const images = [];
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                images.push(canvas.toDataURL('image/png').split(',')[1]);
+            }
+            return images;
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        analyzeBtn.addEventListener('click', async () => {
+            allScores = [];
+            loading.classList.remove('hidden');
+            analyzeBtn.disabled = true;
+            resultSection.classList.add('hidden');
+
+            for (let i = 0; i < imageQueue.length; i++) {
+                progressBar.style.width = `${Math.round((i / imageQueue.length) * 100)}%`;
+                loadingStatus.innerText = `解析中: ${i + 1} / ${imageQueue.length}`;
+                try {
+                    const pageScores = await analyzeImage(imageQueue[i]);
+                    allScores.push(...pageScores);
+                } catch (err) { console.error(err); }
+            }
+
+            progressBar.style.width = `100%`;
+            renderTable(allScores);
+            loading.classList.add('hidden');
+            resultSection.classList.remove('hidden');
+            analyzeBtn.disabled = false;
+        });
+
+        async function analyzeImage(base64Data) {
+            const response = await fetchWithRetry(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        contents: [{
+                            role: "user",
+                            parts: [
+                                { text: "グランドゴルフのスコアカードです。各マスの『左上』の実打数と名前を読み取ってください。JSON形式で返してください。形式: [{name: '氏名', scores: [1, 2, 3, 4, 5, 6, 7, 8], total: 30}, ...]" },
+                                { inlineData: { mimeType: "image/png", data: base64Data } }
+                            ]
+                        }],
+                        generationConfig: {
+                            responseMimeType: "application/json",
+                            responseSchema: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        name: { type: "STRING" },
+                                        scores: { type: "ARRAY", items: { type: "NUMBER" } },
+                                        total: { type: "NUMBER" }
+                                    }
+                                }
+                            }
+                        }
+                    })
+                }
+            );
+            const data = await response.json();
+            return JSON.parse(data.candidates[0].content.parts[0].text);
+        }
+
+        function renderTable(data) {
+            scoreTbody.innerHTML = '';
+            data.forEach((row, rowIndex) => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b hover:bg-green-50 transition";
+                let scoresHtml = row.scores.map((s, i) => `
+                    <td class="p-1 border-r text-center">
+                        <input type="number" value="${s}" class="w-full text-center bg-transparent focus:bg-white" 
+                        onchange="updateRowTotal(${rowIndex}, ${i}, this.value)">
+                    </td>
+                `).join('');
+                tr.innerHTML = `
+                    <td class="p-2 border-r font-bold">
+                        <input type="text" value="${row.name || '選手'}" 
+                        onchange="updateRowName(${rowIndex}, this.value)"
+                        class="w-full bg-transparent focus:bg-white px-1">
+                    </td>
+                    ${scoresHtml}
+                    <td class="p-2 text-center font-bold text-blue-700" id="total-${rowIndex}">${row.total}</td>
+                `;
+                scoreTbody.appendChild(tr);
+            });
+        }
+
+        window.updateRowTotal = (rowIndex, scoreIndex, newValue) => {
+            allScores[rowIndex].scores[scoreIndex] = parseInt(newValue) || 0;
+            const newTotal = allScores[rowIndex].scores.reduce((a, b) => a + b, 0);
+            allScores[rowIndex].total = newTotal;
+            document.getElementById(`total-${rowIndex}`).innerText = newTotal;
+        };
+        window.updateRowName = (rowIndex, newName) => { allScores[rowIndex].name = newName; };
+
+        copyBtn.addEventListener('click', () => {
+            let tsv = "氏名\t1\t2\t3\t4\t5\t6\t7\t8\t合計\n";
+            allScores.forEach(row => { tsv += `${row.name}\t${row.scores.join('\t')}\t${row.total}\n`; });
+            const ta = document.createElement("textarea");
+            ta.value = tsv; document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
+            showToast();
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            let csv = "\ufeff氏名,1,2,3,4,5,6,7,8,合計\n";
+            allScores.forEach(row => { csv += `${row.name},${row.scores.join(',')},${row.total}\n`; });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = `スコア_${new Date().getTime()}.csv`;
+            a.click();
+        });
+
+        function showToast() {
+            toast.style.opacity = "1";
+            setTimeout(() => { toast.style.opacity = "0"; }, 2000);
+        }
+
+        async function fetchWithRetry(url, options, retries = 5, backoff = 1000) {
+            try {
+                const res = await fetch(url, options);
+                if (!res.ok) throw new Error(res.statusText);
+                return res;
+            } catch (err) {
+                if (retries > 0) {
+                    await new Promise(r => setTimeout(r, backoff));
+                    return fetchWithRetry(url, options, retries - 1, backoff * 2);
+                }
+                throw err;
+            }
+        }
+    </script>
+</body>
+</html>
