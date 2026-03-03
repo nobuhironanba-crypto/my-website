@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <!-- 「クラスポータルDABソースコード.txt」復元用スクリプト -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repomix 分割・復元ツール (Un-Repomix)</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip for creating ZIP files in the browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* ドラッグ時のハイライト用アニメーション */
+        .drag-active {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans selection:bg-blue-200">
+
+    <main class="max-w-3xl mx-auto px-4 py-12">
+        <!-- ヘッダー -->
+        <div class="text-center mb-10">
+            <div class="flex justify-center items-center gap-3 mb-4">
+                <i data-lucide="folder-output" class="w-10 h-10 text-blue-600"></i>
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Repomix 分割・復元ツール</h1>
+            </div>
+            <p class="text-slate-600">
+                repomix で1つにまとめられた出力ファイル (.xml, .md, .txt) をドロップするだけで、<br class="hidden sm:block">
+                元のディレクトリ構造を維持したZIPファイルに復元します。
+            </p>
+        </div>
+
+        <!-- アップロードエリア -->
+        <div id="dropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-slate-50 group shadow-sm">
+            <input type="file" id="fileInput" class="hidden" accept=".xml,.md,.txt,.json">
+            <div class="flex flex-col items-center justify-center gap-4 pointer-events-none">
+                <div class="bg-blue-50 text-blue-500 p-4 rounded-full group-hover:scale-110 transition-transform duration-200">
+                    <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <p class="text-lg font-semibold text-slate-700">repomixの出力ファイルをドロップ</p>
+                    <p class="text-sm text-slate-500 mt-1">またはクリックしてファイルを選択</p>
+                </div>
+                <div class="text-xs text-slate-400 mt-2 bg-slate-100 px-3 py-1 rounded-full">
+                    対応フォーマット: XML (推奨) / Markdown / Plain Text
+                </div>
+            </div>
+        </div>
+
+        <!-- ローディング表示 -->
+        <div id="loadingArea" class="hidden mt-8 text-center">
+            <i data-lucide="loader-2" class="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2"></i>
+            <p class="text-slate-600 font-medium text-sm">ファイルを解析中...</p>
+        </div>
+
+        <!-- 結果表示エリア -->
+        <div id="resultArea" class="hidden mt-8">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="border-b border-slate-100 bg-slate-50 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-green-100 text-green-600 p-2 rounded-lg">
+                            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800">解析完了</h3>
+                            <p id="summaryText" class="text-sm text-slate-600"></p>
+                        </div>
+                    </div>
+                    <button id="downloadBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-medium transition-colors shadow-sm focus:ring-4 focus:ring-blue-100">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        ZIPをダウンロード
+                    </button>
+                </div>
+
+                <!-- 検出されたファイル一覧 -->
+                <div class="p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-semibold text-slate-700">復元されるファイル一覧</h4>
+                        <span id="fileCountBadge" class="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-1 rounded-md"></span>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+                        <ul id="fileList" class="max-h-64 overflow-y-auto custom-scrollbar divide-y divide-slate-100">
+                            <!-- JSでリストを挿入 -->
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 border-t border-slate-100 p-4 text-center">
+                    <button id="resetBtn" class="text-sm text-slate-500 hover:text-slate-800 font-medium transition-colors underline-offset-4 hover:underline">
+                        別のファイルを処理する
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="text-center pb-8 text-sm text-slate-400">
+        <p>クライアントサイドで処理されるため、データがサーバーに送信されることはありません。</p>
+    </footer>
+
+    <script>
+        // Lucideアイコンの初期化
+        lucide.createIcons();
+
+        // DOM要素
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const loadingArea = document.getElementById('loadingArea');
+        const resultArea = document.getElementById('resultArea');
+        const fileList = document.getElementById('fileList');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const summaryText = document.getElementById('summaryText');
+        const fileCountBadge = document.getElementById('fileCountBadge');
+
+        let parsedFiles = [];
+
+        // --- イベントリスナー設定 ---
+        
+        // クリックでファイル選択
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // ドラッグ＆ドロップイベント
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('drag-active');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('drag-active');
+            }, false);
+        });
+
+        // ドロップ時の処理
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) handleFile(files[0]);
+        });
+
+        // ファイル入力での選択時
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) handleFile(this.files[0]);
+        });
+
+        // リセットボタン
+        resetBtn.addEventListener('click', () => {
+            resultArea.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+            fileInput.value = '';
+            parsedFiles = [];
+        });
+
+        // ダウンロードボタン
+        downloadBtn.addEventListener('click', generateAndDownloadZip);
+
+        // --- コアロジック ---
+
+        function handleFile(file) {
+            dropZone.classList.add('hidden');
+            loadingArea.classList.remove('hidden');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                setTimeout(() => {
+                    processContent(text);
+                }, 300); // UIスレッドのブロッキング緩和とローディング表示のため少し遅延
+            };
+            reader.onerror = function() {
+                alert("ファイルの読み込みに失敗しました。");
+                resetUI();
+            };
+            reader.readAsText(file);
+        }
+
+        function resetUI() {
+            loadingArea.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+            fileInput.value = '';
+        }
+
+        function processContent(text) {
+            loadingArea.classList.add('hidden');
+            const result = parseRepomixContent(text);
+
+            if (result.files.length === 0) {
+                alert("ファイルを解析できませんでした。\nRepomixの出力ファイル(XML/Markdown/Plain)であることを確認してください。");
+                resetUI();
+                return;
+            }
+
+            parsedFiles = result.files;
+            
+            // 結果UIの更新
+            summaryText.innerHTML = `<span class="font-bold text-blue-600">${result.format}</span> 形式で <span class="font-bold text-blue-600">${parsedFiles.length}</span> 個のファイルを検出`;
+            fileCountBadge.textContent = `${parsedFiles.length} files`;
+
+            fileList.innerHTML = '';
+            parsedFiles.forEach(f => {
+                const li = document.createElement('li');
+                li.className = 'py-2.5 px-4 hover:bg-white text-sm font-mono text-slate-700 truncate flex items-center gap-2';
+                li.innerHTML = `<i data-lucide="file-code" class="w-4 h-4 text-slate-400 shrink-0"></i> <span>${f.path}</span>`;
+                fileList.appendChild(li);
+            });
+            lucide.createIcons(); // 新しく追加したアイコンをレンダリング
+
+            resultArea.classList.remove('hidden');
+        }
+
+        /**
+         * Repomixの出力テキストを解析してファイル群を抽出する
+         */
+        function parseRepomixContent(text) {
+            let files = [];
+            let match;
+
+            // 1. XML Format (Repomix default)
+            const xmlRegex = /<file (?:path|name)="([^"]+)">\n?([\s\S]*?)\n?<\/file>/gi;
+            while ((match = xmlRegex.exec(text)) !== null) {
+                files.push({ path: match[1], content: match[2] });
+            }
+            if (files.length > 0) return { format: 'XML', files };
+
+            // 2. Plain Format
+            // ================================================================
+            // File: path/to/file
+            // ================================================================
+            const plainRegex = /={10,}\n(?:File|ファイル): (.*?)\n={10,}\n([\s\S]*?)(?=\n={10,}\n(?:File|ファイル): |\n*$)/g;
+            while ((match = plainRegex.exec(text)) !== null) {
+                files.push({ path: match[1].trim(), content: match[2] });
+            }
+            if (files.length > 0) return { format: 'Plain Text', files };
+
+            // 3. Markdown Format
+            // ## File: path/to/file
+            const mdRegex = /## (?:File|ファイル): (.*?)\n([\s\S]*?)(?=\n## (?:File|ファイル): |$)/g;
+            while ((match = mdRegex.exec(text)) !== null) {
+                let path = match[1].trim();
+                let rawContent = match[2];
+                
+                // マークダウンのコードブロック (```lang ... ```) を除去
+                let lines = rawContent.trim().split('\n');
+                if (lines.length >= 2 && lines[0].startsWith('```') && lines[lines.length - 1].startsWith('```')) {
+                    lines.shift(); // 先頭の ``` を削除
+                    lines.pop();   // 末尾の ``` を削除
+                }
+                
+                files.push({ path, content: lines.join('\n') });
+            }
+            if (files.length > 0) return { format: 'Markdown', files };
+
+            // 該当フォーマットなし
+            return { format: 'Unknown', files: [] };
+        }
+
+        /**
+         * JSZipを使用してZIPファイルを生成・ダウンロード
+         */
+        async function generateAndDownloadZip() {
+            if (parsedFiles.length === 0) return;
+
+            const originalText = downloadBtn.innerHTML;
+            downloadBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 圧縮中...`;
+            downloadBtn.disabled = true;
+            lucide.createIcons();
+
+            try {
+                const zip = new JSZip();
+
+                // ファイルをZIPに追加（JSZipが自動的にディレクトリ構造を構築します）
+                parsedFiles.forEach(file => {
+                    zip.file(file.path, file.content);
+                });
+
+                // ZIP生成
+                const blob = await zip.generateAsync({ type: "blob" });
+                
+                // ダウンロード処理
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'extracted-repository.zip';
+                document.body.appendChild(a);
+                a.click();
+                
+                // クリーンアップ
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+            } catch (error) {
+                console.error(error);
+                alert("ZIPファイルの生成に失敗しました。");
+            } finally {
+                downloadBtn.innerHTML = originalText;
+                downloadBtn.disabled = false;
+                lucide.createIcons();
+            }
+        }
+    </script>
+</body>
+</html>
