@@ -1,0 +1,317 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAS権限の魔法をかけなおそう</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Kiwi Maru', serif;
+            background-color: #fffaf4;
+            color: #5d4037;
+            line-height: 1.6;
+        }
+        .page-card {
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.03);
+            border: 3px solid #ffecb3;
+            overflow: hidden;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+        .step-number {
+            background: #ff8a65;
+            color: white;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 10px rgba(255,138,101,0.3);
+        }
+        /* ダークモードUI再現 */
+        .google-dark-ui {
+            background: #1f1f1f;
+            color: #e3e3e3;
+            border-radius: 16px;
+            padding: 20px;
+            font-family: 'Inter', sans-serif;
+            max-width: 520px;
+            margin: 0 auto;
+        }
+        .app-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .app-list-item:hover {
+            background: #2d2d2d;
+        }
+        .app-icon {
+            width: 36px;
+            height: 36px;
+            background: #ffccbc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        .delete-section {
+            background: #1f1f1f;
+            border: 2px solid #4a4a4a;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+        .popup-box {
+            background: #2d2e31;
+            border-radius: 24px;
+            padding: 24px;
+            width: 90%;
+            max-width: 320px;
+            margin: 20px auto;
+            border: 1px solid #444;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        /* 認証画面 */
+        .auth-window-dark {
+            background: #1f1f1f;
+            color: #e3e3e3;
+            border-radius: 28px;
+            padding: 28px;
+            max-width: 480px;
+            margin: 0 auto;
+            border: 1px solid #333;
+        }
+        .check-box-dark {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #a8c7fa;
+            border-radius: 4px;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 12px;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .check-box-dark.checked {
+            background: #a8c7fa;
+        }
+        .check-box-dark.checked::after {
+            content: '✓';
+            color: #062e6f;
+            position: absolute;
+            top: -5px;
+            left: 2px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .btn-blue-pill {
+            background: #a8c7fa;
+            color: #062e6f;
+            padding: 10px 28px;
+            border-radius: 24px;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+        .important-red-frame {
+            border: 4px dashed #ff5252;
+            padding: 16px;
+            border-radius: 20px;
+            background: rgba(255, 82, 82, 0.05);
+            position: relative;
+        }
+        .finger-pointer {
+            font-size: 3rem;
+            animation: bounceSide 0.6s infinite alternate;
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.2));
+        }
+        @keyframes bounceSide {
+            from { transform: translateX(0); }
+            to { transform: translateX(20px); }
+        }
+        .marker {
+            background: linear-gradient(transparent 60%, #ffe082 60%);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-3xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-16">
+            <div class="inline-block mb-4">
+                <span class="text-5xl">🐱🤖</span>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold mb-4">
+                <span class="block text-xl text-orange-400 mb-2 font-medium">おたすけ・ねこロボくんの魔法をなおそう</span>
+                GAS権限のやりなおしガイド
+            </h1>
+            <p class="text-gray-600 max-w-lg mx-auto">
+                チェックを入れ忘れちゃうと、ねこロボくんが動けなくなっちゃいます。一度きれいに忘れてもらって、もう一度「許可」をしましょう！
+            </p>
+        </header>
+
+        <!-- Step 1: 接続画面へ -->
+        <section class="page-card p-6 md:p-10">
+            <div class="step-number">1</div>
+            <h2 class="text-2xl font-bold mb-4 text-orange-700">まずは設定画面でアプリを探す</h2>
+            <p class="mb-6">
+                下のボタンから設定画面を開き、<span class="marker">おたすけ・ねこロボくん</span>を見つけて右端の <b>「 ＞ 」</b> を押してください。
+            </p>
+            
+            <div class="google-dark-ui mb-8 shadow-xl">
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="text-gray-400">←</span>
+                    <span class="text-lg font-medium">サードパーティ製のアプリとサービス</span>
+                </div>
+                <div class="app-list-item bg-[#2d2d2d] rounded-2xl mb-4 border border-gray-700">
+                    <div class="flex items-center gap-4">
+                        <div class="app-icon">🐱</div>
+                        <div>
+                            <p class="text-sm font-bold text-white">おたすけ・ねこロボくん</p>
+                            <p class="text-[10px] text-gray-400">1 個の接続</p>
+                        </div>
+                    </div>
+                    <span class="text-gray-400 font-bold text-xl">＞</span>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <a href="https://myaccount.google.com/connections" target="_blank" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-10 rounded-full shadow-lg inline-block transition-all transform hover:scale-105">
+                    Googleの接続設定を開く ↗
+                </a>
+            </div>
+        </section>
+
+        <!-- Step 2: 削除と確認ポップアップ -->
+        <section class="page-card p-6 md:p-10">
+            <div class="step-number">2</div>
+            <h2 class="text-2xl font-bold mb-4 text-orange-700">「接続をすべて削除」して確認！</h2>
+            <p class="mb-6">
+                詳細画面のいちばん下にある、ゴミ箱マークのついた項目を押します。そのあと出る確認画面で <span class="marker">「確認」</span> を押せばOKです。
+            </p>
+            
+            <div class="google-dark-ui mb-6 p-8 bg-[#181818]">
+                <div class="delete-section hover:bg-[#282828] transition-colors border-[#ff8a65] border-2">
+                    <div class="w-10 h-10 bg-[#33201b] rounded-full flex items-center justify-center text-xl">🗑️</div>
+                    <div class="flex-1">
+                        <p class="text-xs font-bold text-white">おたすけ・ねこロボくん との接続をすべて削除しますか？</p>
+                    </div>
+                    <span class="text-gray-400 text-xl">＞</span>
+                </div>
+
+                <!-- Popup -->
+                <div class="popup-box">
+                    <p class="text-center text-[13px] text-white font-medium mb-6">接続を削除しますか？</p>
+                    <div class="flex justify-end gap-8 text-[#a8c7fa] font-bold text-sm">
+                        <span>キャンセル</span>
+                        <span class="relative">
+                            確認
+                            <div class="absolute -right-16 -top-2">
+                                <span class="finger-pointer">👈</span>
+                            </div>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <p class="text-center text-sm font-bold text-red-500">※これをやってもデータは消えないので安心してくださいね！</p>
+        </section>
+
+        <!-- Step 3: 再実行 -->
+        <section class="page-card p-6 md:p-10 bg-blue-50/50 border-blue-200">
+            <div class="step-number">3</div>
+            <h2 class="text-2xl font-bold mb-4 text-blue-800">もう一度「実行」して承認画面へ</h2>
+            <p class="mb-6">スプレッドシートなどの画面に戻って、もう一度 <b>「実行」</b> を押してください。すると魔法の入り口が開きます。</p>
+            
+            <div class="bg-white border-4 border-blue-100 rounded-3xl p-8 max-w-sm mx-auto text-center shadow-inner">
+                <p class="text-sm mb-4 font-bold text-gray-500">承認が必要です</p>
+                <div class="text-blue-600 font-bold underline decoration-2 text-lg hover:text-blue-700 cursor-pointer">
+                    権限を確認<br>
+                    <span class="text-[10px] text-gray-400 font-normal">(REVIEW PERMISSIONS)</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 4: 【最重要】チェックボックス -->
+        <section class="page-card p-6 md:p-10 border-red-400 bg-red-50">
+            <div class="step-number bg-red-500">4</div>
+            <h2 class="text-2xl font-bold mb-4 text-red-800">【ここが本番！】全部に青いチェックを！</h2>
+            <p class="mb-6">
+                これが最後のステップです！<br>
+                <span class="marker">「すべて選択」</span> を押して、全部の項目が青くなっていることを確認してください。
+            </p>
+            
+            <div class="auth-window-dark shadow-2xl">
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold mb-2 leading-tight">おたすけ・ねこロボくん が Google アカウントへのアクセスを求めています</h3>
+                    <p class="text-[10px] text-blue-300 bg-blue-900/30 inline-block px-2 py-1 rounded">user@gmail.com</p>
+                </div>
+
+                <div class="space-y-4 mb-8">
+                    <div class="important-red-frame">
+                        <div class="flex items-center gap-3 mb-4 cursor-pointer">
+                            <div class="check-box-dark checked"></div>
+                            <p class="text-xs font-bold text-white">すべて選択</p>
+                        </div>
+                        
+                        <div class="border-t border-gray-700 pt-4 space-y-5">
+                            <div class="flex items-start gap-3">
+                                <div class="check-box-dark checked"></div>
+                                <p class="text-[10px] text-gray-300">Google ドライブのすべてのファイルの表示、編集、作成、削除</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="check-box-dark checked"></div>
+                                <p class="text-[10px] text-gray-300">Google スプレッドシートのすべてのスプレッドシートの参照...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-start items-center gap-4 pt-2">
+                        <span class="finger-pointer">👈</span>
+                        <div class="bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-lg animate-pulse">
+                            全部青くしてね！
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-8 items-center pt-4">
+                    <span class="text-blue-300 text-sm font-medium">キャンセル</span>
+                    <button class="btn-blue-pill shadow-lg shadow-blue-900/20">続行</button>
+                </div>
+            </div>
+
+            <div class="mt-10 p-6 bg-white rounded-2xl border-4 border-red-500 text-center shadow-xl">
+                <p class="font-bold text-red-600 text-lg">
+                    「続行」を押せば成功です！✨
+                </p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="text-center p-12 bg-orange-100/50 rounded-[40px] border-2 border-orange-200">
+            <div class="text-4xl mb-4">👏✨</div>
+            <p class="text-xl font-bold text-orange-800 mb-2">これでねこロボくんが動きだします！</p>
+            <p class="text-sm text-orange-700">
+                もしまた機嫌が悪くなったら（動かなくなったら）、<br>
+                このガイドを最初からためしてみてくださいね。
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
